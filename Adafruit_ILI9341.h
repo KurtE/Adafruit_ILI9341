@@ -121,6 +121,12 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
   /* These are not for current use, 8-bit protocol only! */
   uint8_t  readdata(void),
     readcommand8(uint8_t reg, uint8_t index = 0);
+
+	// Added functions to read pixel data...
+  uint16_t readPixel(int16_t x, int16_t y);
+  void     readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
+  void     writeRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
+
   /*
   uint16_t readcommand16(uint8_t);
   uint32_t readcommand32(uint8_t);
@@ -129,12 +135,15 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
 
   void     spiwrite(uint8_t),
     writecommand(uint8_t c),
+    writecommand_cont(uint8_t c),
     writedata(uint8_t d),
+    writedata_cont(uint8_t d),
     commandList(uint8_t *addr);
   uint8_t  spiread(void);
 
  private:
   uint8_t  tabcolor;
+  void setAddr(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) __attribute__((always_inline)) ;
 
 
 

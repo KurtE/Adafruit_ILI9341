@@ -95,6 +95,18 @@ void Adafruit_ILI9341::writecommand(uint8_t c) {
   //digitalWrite(_cs, HIGH);
 }
 
+// Like above, but does not raise CS at end
+void Adafruit_ILI9341::writecommand_cont(uint8_t c) {
+  *dcport &=  ~dcpinmask;
+  //digitalWrite(_dc, LOW);
+  //*clkport &= ~clkpinmask; // clkport is a NULL pointer when hwSPI==true
+  //digitalWrite(_sclk, LOW);
+  *csport &= ~cspinmask;
+  //digitalWrite(_cs, LOW);
+
+  spiwrite(c);
+}
+
 
 void Adafruit_ILI9341::writedata(uint8_t c) {
   *dcport |=  dcpinmask;
@@ -108,6 +120,17 @@ void Adafruit_ILI9341::writedata(uint8_t c) {
 
   //digitalWrite(_cs, HIGH);
   *csport |= cspinmask;
+} 
+
+void Adafruit_ILI9341::writedata_cont(uint8_t c) {
+  *dcport |=  dcpinmask;
+  //digitalWrite(_dc, HIGH);
+  //*clkport &= ~clkpinmask; // clkport is a NULL pointer when hwSPI==true
+  //digitalWrite(_sclk, LOW);
+  *csport &= ~cspinmask;
+  //digitalWrite(_cs, LOW);
+  
+  spiwrite(c);
 } 
 
 // If the SPI library has transaction support, these functions
@@ -341,22 +364,26 @@ void Adafruit_ILI9341::begin(void) {
 
 }
 
+void Adafruit_ILI9341::setAddr(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
+{
+  writecommand_cont(ILI9341_CASET); // Column addr set
+  writedata_cont(x0 >> 8);
+  writedata_cont(x0 & 0xFF);     // XSTART 
+  writedata_cont(x1 >> 8);
+  writedata_cont(x1 & 0xFF);     // XEND
+
+  writecommand_cont(ILI9341_PASET); // Row addr set
+  writedata_cont(y0>>8);
+  writedata_cont(y0);     // YSTART
+  writedata_cont(y1>>8);
+  writedata_cont(y1);     // YEND
+}
+
 
 void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
  uint16_t y1) {
 
-  writecommand(ILI9341_CASET); // Column addr set
-  writedata(x0 >> 8);
-  writedata(x0 & 0xFF);     // XSTART 
-  writedata(x1 >> 8);
-  writedata(x1 & 0xFF);     // XEND
-
-  writecommand(ILI9341_PASET); // Row addr set
-  writedata(y0>>8);
-  writedata(y0);     // YSTART
-  writedata(y1>>8);
-  writedata(y1);     // YEND
-
+  setAddr(x0, y0, x1, y1);
   writecommand(ILI9341_RAMWR); // write to RAM
 }
 
@@ -602,6 +629,70 @@ uint8_t Adafruit_ILI9341::readcommand8(uint8_t c, uint8_t index) {
    digitalWrite(_cs, HIGH);
    if (hwSPI) spi_end();
    return r;
+}
+
+// Read Pixel at x,y and get back 16-bit packed color
+uint16_t Adafruit_ILI9341::readPixel(int16_t x, int16_t y)
+{
+	uint8_t dummy,r,g,b;
+
+   if (hwSPI) spi_begin();
+
+    setAddr(x, y, x, y);
+    writecommand_cont(ILI9341_RAMRD); // read from RAM
+//	waitTransmitComplete();
+    *dcport |=  dcpinmask;  // make sure we are in data mode
+
+	// Read Pixel Data
+	dummy = spiread();	// Read a DUMMY byte of GRAM
+	r = spiread();		// Read a RED byte of GRAM
+	g = spiread();		// Read a GREEN byte of GRAM
+	b = spiread();		// Read a BLUE byte of GRAM
+   *csport |= cspinmask;
+ //  digitalWrite(_cs, HIGH);
+   if (hwSPI) spi_end();
+	return color565(r,g,b);
+}
+
+// Now lets see if we can read in multiple pixels
+void Adafruit_ILI9341::readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors) 
+{
+	uint8_t dummy,r,g,b;
+    uint16_t c = w * h;
+    if (hwSPI) spi_begin();
+
+	setAddr(x, y, x+w-1, y+h-1);
+    writecommand_cont(ILI9341_RAMRD); // read from RAM
+    *dcport |=  dcpinmask;  // make sure we are in data mode
+
+//    spiwrite(c);
+   	dummy = spiread();	// Read a DUMMY byte of GRAM
+
+    while (c--) {
+        r = spiread();		// Read a RED byte of GRAM
+        g = spiread();		// Read a GREEN byte of GRAM
+        b = spiread();		// Read a BLUE byte of GRAM
+        *pcolors++ = color565(r,g,b);
+    }
+   *csport |= cspinmask;
+   if (hwSPI) spi_end();
+}
+
+// Now lets see if we can writemultiple pixels
+void Adafruit_ILI9341::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors) 
+{
+    if (hwSPI) spi_begin();
+	setAddr(x, y, x+w-1, y+h-1);
+	writecommand_cont(ILI9341_RAMWR);
+    *dcport |=  dcpinmask;  // make sure we are in data mode
+	for(y=h; y>0; y--) {
+		for(x=w; x>0; x--) {
+            spiwrite(*pcolors >> 8);
+            spiwrite(*pcolors++ & 0xff);
+		}
+	}
+    *csport |= cspinmask;
+   if (hwSPI) spi_end();
 }
 
 
