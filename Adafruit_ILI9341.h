@@ -96,13 +96,14 @@
 #define ILI9341_YELLOW  0xFFE0  
 #define ILI9341_WHITE   0xFFFF
 
+//=================================================================
+// Hardware SPI version
+//=================================================================
 
 class Adafruit_ILI9341 : public Adafruit_GFX {
 
  public:
 
-  Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _MOSI, int8_t _SCLK,
-		   int8_t _RST, int8_t _MISO);
   Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _RST = -1);
 
   void     begin(void),
@@ -118,27 +119,91 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
            invertDisplay(boolean i);
   uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
 
-  /* These are not for current use, 8-bit protocol only! */
+   /* readdata is now used in readPixel/readRect, readcommand8 used in test programs */
   uint8_t  readdata(void),
-    readcommand8(uint8_t reg, uint8_t index = 0);
+           readcommand8(uint8_t reg, uint8_t index = 0);
 
 	// Added functions to read pixel data...
   uint16_t readPixel(int16_t x, int16_t y);
   void     readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
   void     writeRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
 
-  /*
-  uint16_t readcommand16(uint8_t);
-  uint32_t readcommand32(uint8_t);
-  void     dummyclock(void);
-  */  
+
+  void     spiwrite(uint8_t) __attribute__((always_inline)),
+           spiwrite16(uint16_t) __attribute__((always_inline)),
+           spiwriteN(uint32_t, uint16_t) __attribute__((always_inline)),
+           writecommand(uint8_t c),
+           writecommand_cont(uint8_t c),
+           writedata(uint8_t d),
+           writedata_cont(uint8_t d),
+           writedata16(uint16_t color),
+           writedata16_cont(uint16_t color),
+           commandList(uint8_t *addr);
+  uint8_t  spiread(void);
+
+ private:
+  uint8_t  tabcolor;
+  void setAddr(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) __attribute__((always_inline)) ;
+  void spi_begin(void) __attribute__((always_inline));
+  void spi_end(void) __attribute__((always_inline));
+
+
+
+#if defined (__AVR__) || defined(TEENSYDUINO)
+  uint8_t mySPCR;
+  volatile uint8_t *dcport, *rsport, *csport;
+  int8_t  _cs, _dc, _rst;
+  uint8_t  clkpinmask, cspinmask, dcpinmask;
+#elif defined (__arm__)
+    volatile RwReg *dcport, *rsport, *csport;
+    uint32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
+    uint32_t  clkpinmask, cspinmask, dcpinmask;
+#endif
+};
+
+//=================================================================
+// Software SPI version
+//=================================================================
+class Adafruit_ILI9341S : public Adafruit_GFX {
+
+ public:
+
+  Adafruit_ILI9341S(int8_t _CS, int8_t _DC, int8_t _MOSI, int8_t _SCLK,
+		   int8_t _RST, int8_t _MISO);
+
+  void     begin(void),
+           setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1),
+           pushColor(uint16_t color),
+           fillScreen(uint16_t color),
+           drawPixel(int16_t x, int16_t y, uint16_t color),
+           drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color),
+           drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color),
+           fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
+             uint16_t color),
+           setRotation(uint8_t r),
+           invertDisplay(boolean i);
+  uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
+
+   /* readdata is now used in readPixel/readRect, readcommand8 used in test programs */
+  uint8_t  readdata(void),
+           readcommand8(uint8_t reg, uint8_t index = 0);
+
+	// Added functions to read pixel data...
+  uint16_t readPixel(int16_t x, int16_t y);
+  void     readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
+  void     writeRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
+
 
   void     spiwrite(uint8_t),
-    writecommand(uint8_t c),
-    writecommand_cont(uint8_t c),
-    writedata(uint8_t d),
-    writedata_cont(uint8_t d),
-    commandList(uint8_t *addr);
+           spiwrite16(uint16_t),
+           spiwriteN(uint32_t, uint16_t),
+           writecommand(uint8_t c),
+           writecommand_cont(uint8_t c),
+           writedata(uint8_t d),
+           writedata_cont(uint8_t d),
+           writedata16(uint16_t color),
+           writedata16_cont(uint16_t color),
+           commandList(uint8_t *addr);
   uint8_t  spiread(void);
 
  private:
@@ -146,8 +211,6 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
   void setAddr(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) __attribute__((always_inline)) ;
 
 
-
-  boolean  hwSPI;
 #if defined (__AVR__) || defined(TEENSYDUINO)
   uint8_t mySPCR;
   volatile uint8_t *mosiport, *clkport, *dcport, *rsport, *csport;
