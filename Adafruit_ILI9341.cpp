@@ -64,7 +64,7 @@ void inline Adafruit_ILI9341::spiwrite16(uint16_t c) {
 }
 
 void inline Adafruit_ILI9341::spiwriteN(uint32_t count, uint16_t c) {
-#if defined(TEENSYDUINO) || (defined (__AVR__) && SPI_HAS_TRANSACTION)
+#if defined(TEENSYDUINO) || SPI_HAS_TRANSACTION
   while(count--) spiwrite16(c);
 #else
   union { uint16_t val; struct { uint8_t lsb; uint8_t msb; }; } out;
