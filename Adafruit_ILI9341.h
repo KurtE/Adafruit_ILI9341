@@ -147,18 +147,49 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
   void spi_begin(void) __attribute__((always_inline));
   void spi_end(void) __attribute__((always_inline));
 
-
-
 #if defined (__AVR__) || defined(TEENSYDUINO)
   uint8_t mySPCR;
   volatile uint8_t *dcport, *rsport, *csport;
   int8_t  _cs, _dc, _rst;
   uint8_t  clkpinmask, cspinmask, dcpinmask;
+#elif defined (__ARDUINO_X86__)
+  uint8_t mySPCR;
+  int8_t  _cs, _dc, _rst;
 #elif defined (__arm__)
     volatile RwReg *dcport, *rsport, *csport;
-    uint32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
+    uint32_t  _cs, _dc, _rst, _clk, _miso, _sclk;
     uint32_t  clkpinmask, cspinmask, dcpinmask;
 #endif
+
+  void DCHigh()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_dc, HIGH);
+#else
+      *dcport |=  dcpinmask;
+#endif
+	}
+  void DCLow()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_dc, LOW);
+#else
+      DCLow();
+#endif
+	}
+
+  void CSHigh()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_cs, HIGH);
+#else
+      *csport |=  cspinmask;
+#endif
+	}
+  void CSLow()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_cs, LOW);
+#else
+      *csport &=  ~cspinmask;
+#endif
+	}
 };
 
 //=================================================================
@@ -216,11 +247,93 @@ class Adafruit_ILI9341S : public Adafruit_GFX {
   volatile uint8_t *mosiport, *clkport, *dcport, *rsport, *csport;
   int8_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
   uint8_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
+#elif defined (__ARDUINO_X86__)
+  uint8_t mySPCR;
+  int8_t  _cs, _dc, _rst, _sclk, _miso, _mosi;
 #elif defined (__arm__)
-    volatile RwReg *mosiport, *clkport, *dcport, *rsport, *csport;
-    uint32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
-    uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
+    volatile RwReg *clkport, *clkport, *dcport, *rsport, *csport;
+    uint32_t  _cs, _dc, _rst, _clk, _miso, _sclk;
+    uint32_t  clkpinmask, clkpinmask, cspinmask, dcpinmask;
 #endif
+  void DCHigh()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_dc, HIGH);
+#else
+      *dcport |=  dcpinmask;
+#endif
+	}
+ 
+  void DCLow()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_dc, LOW);
+#else
+      DCLow();
+#endif
+	}
+
+  void CSHigh()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_cs, HIGH);
+#else
+      *csport |=  cspinmask;
+#endif
+	}
+ 
+  void CSLow()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_cs, LOW);
+#else
+      *csport &=  ~cspinmask;
+#endif
+}
+
+  void MOSIHigh()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_mosi, HIGH);
+#else
+      *mosiport |=  mosipinmask;
+#endif
+	}
+
+  void MOSILow()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_mosi, LOW);
+#else
+      *mosiport &=  ~mosipinmask;
+#endif
+	}
+
+//  void MISOHigh()  __attribute__((always_inline)) {
+//#if defined( __ARDUINO_X86__)
+//      digitalWrite(_miso, HIGH);
+//#else
+//      *misoport |=  misopinmask;
+//#endif
+//	}
+
+//  void MISOLow()  __attribute__((always_inline)) {
+//#if defined( __ARDUINO_X86__)
+//      digitalWrite(_miso, LOW);
+//#else
+//      *misoport &=  ~misopinmask;
+//#endif
+//	}
+    
+  void CLKHigh()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_sclk, HIGH);
+#else
+      *clkport |=  clkpinmask;
+#endif
+	}
+  void CLKLow()  __attribute__((always_inline)) {
+#if defined( __ARDUINO_X86__)
+      digitalWrite(_sclk, LOW);
+#else
+      *clkport &=  ~clkpinmask;
+#endif
+	}
+
 };
 
 #endif

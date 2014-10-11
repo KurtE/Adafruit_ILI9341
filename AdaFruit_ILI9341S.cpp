@@ -17,8 +17,11 @@
 #include <avr/pgmspace.h>
 #include <limits.h>
 #include "pins_arduino.h"
+#ifndef __ARDUINO_X86__
 #include "wiring_private.h"
+#endif
 #include <SPI.h>
+
 
 // This is the Software SPI version
 
@@ -41,15 +44,15 @@ void Adafruit_ILI9341S::spiwrite(uint8_t c) {
   for(uint8_t bit = 0x80; bit; bit >>= 1) {
     if(c & bit) {
 	  //digitalWrite(_mosi, HIGH); 
-	  *mosiport |=  mosipinmask;
+	  MOSIHigh();
     } else {
 	  //digitalWrite(_mosi, LOW); 
-	  *mosiport &= ~mosipinmask;
+	  MOSILow();
     }
     //digitalWrite(_sclk, HIGH);
-    *clkport |=  clkpinmask;
+    CLKHigh();
     //digitalWrite(_sclk, LOW);
-    *clkport &= ~clkpinmask;
+    CLKLow();
   }
 }
 
@@ -65,26 +68,26 @@ void inline Adafruit_ILI9341S::spiwriteN(uint32_t count, uint16_t c) {
 }
 
 void Adafruit_ILI9341S::writecommand(uint8_t c) {
-  *dcport &=  ~dcpinmask;
+  DCLow();
   //digitalWrite(_dc, LOW);
-  //*clkport &= ~clkpinmask; // clkport is a NULL pointer when hwSPI==true
+  //CLKLow(); // clkport is a NULL pointer when hwSPI==true
   //digitalWrite(_sclk, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwrite(c);
 
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
 }
 
 // Like above, but does not raise CS at end
 void Adafruit_ILI9341S::writecommand_cont(uint8_t c) {
-  *dcport &=  ~dcpinmask;
+  DCLow();
   //digitalWrite(_dc, LOW);
-  //*clkport &= ~clkpinmask; // clkport is a NULL pointer when hwSPI==true
+  //CLKLow(); // clkport is a NULL pointer when hwSPI==true
   //digitalWrite(_sclk, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwrite(c);
@@ -92,42 +95,42 @@ void Adafruit_ILI9341S::writecommand_cont(uint8_t c) {
 
 
 void Adafruit_ILI9341S::writedata(uint8_t c) {
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  //*clkport &= ~clkpinmask; // clkport is a NULL pointer when hwSPI==true
+  //CLKLow(); // clkport is a NULL pointer when hwSPI==true
   //digitalWrite(_sclk, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
   
   spiwrite(c);
 
   //digitalWrite(_cs, HIGH);
-  *csport |= cspinmask;
+  CSHigh();
 } 
 
 void Adafruit_ILI9341S::writedata_cont(uint8_t c) {
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  //*clkport &= ~clkpinmask; // clkport is a NULL pointer when hwSPI==true
+  //CLKLow(); // clkport is a NULL pointer when hwSPI==true
   //digitalWrite(_sclk, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
   
   spiwrite(c);
 } 
 
 void Adafruit_ILI9341S::writedata16(uint16_t color) {
-  *dcport |=  dcpinmask;
-  *csport &= ~cspinmask;
+  DCHigh();
+  CSLow();
 
   spiwrite16(color);
 
-  *csport |= cspinmask;
+  CSHigh();
 }
 
 void Adafruit_ILI9341S::writedata16_cont(uint16_t color) {
-  *dcport |=  dcpinmask;
-  *csport &= ~cspinmask;
+  DCHigh();
+  CSLow();
   spiwrite16(color);
 }
 
@@ -174,20 +177,26 @@ void Adafruit_ILI9341S::begin(void) {
 
   pinMode(_dc, OUTPUT);
   pinMode(_cs, OUTPUT);
+
+#ifndef __ARDUINO_X86__
   csport    = portOutputRegister(digitalPinToPort(_cs));
   cspinmask = digitalPinToBitMask(_cs);
   dcport    = portOutputRegister(digitalPinToPort(_dc));
   dcpinmask = digitalPinToBitMask(_dc);
+#endif
 
   pinMode(_sclk, OUTPUT);
   pinMode(_mosi, OUTPUT);
   pinMode(_miso, INPUT);
+
+#ifndef __ARDUINO_X86__
   clkport     = portOutputRegister(digitalPinToPort(_sclk));
   clkpinmask  = digitalPinToBitMask(_sclk);
   mosiport    = portOutputRegister(digitalPinToPort(_mosi));
   mosipinmask = digitalPinToBitMask(_mosi);
-  *clkport   &= ~clkpinmask;
-  *mosiport  &= ~mosipinmask;
+#endif
+  CLKLow();
+  MOSILow();
 
   // toggle RST low to reset
   if (_rst > 0) {
@@ -341,13 +350,13 @@ void Adafruit_ILI9341S::drawPixel(int16_t x, int16_t y, uint16_t color) {
   setAddrWindow(x,y,x+1,y+1);
 
   //digitalWrite(_dc, HIGH);
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_cs, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
 
   spiwrite16(color);
 
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
 }
 
@@ -363,13 +372,13 @@ void Adafruit_ILI9341S::drawFastVLine(int16_t x, int16_t y, int16_t h,
 
   setAddrWindow(x, y, x, y+h-1);
 
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwriteN(h, color);
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
 }
 
@@ -382,12 +391,12 @@ void Adafruit_ILI9341S::drawFastHLine(int16_t x, int16_t y, int16_t w,
   if((x+w-1) >= _width)  w = _width-x;
   setAddrWindow(x, y, x+w-1, y);
 
-  *dcport |=  dcpinmask;
-  *csport &= ~cspinmask;
+  DCHigh();
+  CSLow();
   //digitalWrite(_dc, HIGH);
   //digitalWrite(_cs, LOW);
   spiwriteN(w, color);
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
 }
 
@@ -406,14 +415,14 @@ void Adafruit_ILI9341S::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
 
   setAddrWindow(x, y, x+w-1, y+h-1);
 
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwriteN((uint32_t)h*w, color);
   //digitalWrite(_cs, HIGH);
-  *csport |= cspinmask;
+  CSHigh();
 }
 
 
@@ -518,14 +527,14 @@ uint16_t Adafruit_ILI9341S::readPixel(int16_t x, int16_t y)
 
     setAddr(x, y, x, y);
     writecommand_cont(ILI9341_RAMRD); // read from RAM
-    *dcport |=  dcpinmask;  // make sure we are in data mode
+    DCHigh();  // make sure we are in data mode
 
 	// Read Pixel Data
 	r = spiread();	    // Read a DUMMY byte of GRAM
 	r = spiread();		// Read a RED byte of GRAM
 	g = spiread();		// Read a GREEN byte of GRAM
 	b = spiread();		// Read a BLUE byte of GRAM
-   *csport |= cspinmask;
+   CSHigh();
  //  digitalWrite(_cs, HIGH);
 	return color565(r,g,b);
 }
@@ -538,7 +547,7 @@ void Adafruit_ILI9341S::readRect(int16_t x, int16_t y, int16_t w, int16_t h, uin
 
 	setAddr(x, y, x+w-1, y+h-1);
     writecommand_cont(ILI9341_RAMRD); // read from RAM
-    *dcport |=  dcpinmask;  // make sure we are in data mode
+    DCHigh();  // make sure we are in data mode
 
 //    spiwrite(c);
    	r = spiread();	        // Read a DUMMY byte of GRAM
@@ -549,7 +558,7 @@ void Adafruit_ILI9341S::readRect(int16_t x, int16_t y, int16_t w, int16_t h, uin
         b = spiread();		// Read a BLUE byte of GRAM
         *pcolors++ = color565(r,g,b);
     }
-   *csport |= cspinmask;
+   CSHigh();
 }
 
 // Now lets see if we can writemultiple pixels
@@ -557,12 +566,12 @@ void Adafruit_ILI9341S::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, ui
 {
 	setAddr(x, y, x+w-1, y+h-1);
 	writecommand_cont(ILI9341_RAMWR);
-    *dcport |=  dcpinmask;  // make sure we are in data mode
+    DCHigh();  // make sure we are in data mode
 	for(y=h; y>0; y--) {
 		for(x=w; x>0; x--) {
             spiwrite(*pcolors >> 8);
             spiwrite(*pcolors++ & 0xff);
 		}
 	}
-    *csport |= cspinmask;
+    CSHigh();
 }

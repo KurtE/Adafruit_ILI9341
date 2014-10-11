@@ -17,7 +17,9 @@
 #include <avr/pgmspace.h>
 #include <limits.h>
 #include "pins_arduino.h"
+#ifndef __ARDUINO_X86__
 #include "wiring_private.h"
+#endif
 #include <SPI.h>
 
 //Hardware SPI version. 
@@ -34,7 +36,7 @@ void inline Adafruit_ILI9341::spiwrite(uint8_t c) {
 
   //Serial.print("0x"); Serial.print(c, HEX); Serial.print(", ");
 
-#if defined(TEENSYDUINO) || (defined (__AVR__) && SPI_HAS_TRANSACTION)
+#if defined(TEENSYDUINO) || defined( __ARDUINO_X86__) || (defined (__AVR__) && SPI_HAS_TRANSACTION)
   // transaction sets mode
   SPI.transfer(c);
 #elif defined (__AVR__)
@@ -48,13 +50,21 @@ void inline Adafruit_ILI9341::spiwrite(uint8_t c) {
   SPI.setBitOrder(MSBFIRST);
   SPI.setDataMode(SPI_MODE0);
   SPI.transfer(c);
-#endif
+#else
+  zzz
+  #endif
 }
 
 void inline Adafruit_ILI9341::spiwrite16(uint16_t c) {
 #if defined(TEENSYDUINO) || (defined (__AVR__) && SPI_HAS_TRANSACTION)
   // transfer 16 bits at once. New in 1.5.8
   SPI.transfer16(c);
+#elif defined (__ARDUINO_X86__)
+  uint8_t txData[2];
+  uint8_t rxData[2];
+txData[0] = (c>>8) & 0xff;
+  txData[1] = c & 0xff; 
+  SPI.transferBuffer(txData, rxData, 2);
 #else
   union { uint16_t val; struct { uint8_t lsb; uint8_t msb; }; } out;
   out.val = c;
@@ -62,10 +72,27 @@ void inline Adafruit_ILI9341::spiwrite16(uint16_t c) {
   spiwrite(out.lsb);
 #endif
 }
-
+#define X86_BUFFSIZE 32
 void inline Adafruit_ILI9341::spiwriteN(uint32_t count, uint16_t c) {
 #if defined(TEENSYDUINO) || SPI_HAS_TRANSACTION
   while(count--) spiwrite16(c);
+#elif defined( __ARDUINO_X86__)
+  if (count < X86_BUFFSIZE)
+	while(count--) spiwrite16(c);
+  else {	
+    uint8_t txData[2*X86_BUFFSIZE];
+    uint8_t rxData[2*X86_BUFFSIZE];
+    for (uint8_t i = 0; i < X86_BUFFSIZE*2; i+=2) {
+      txData[i] = (c>>8) & 0xff;
+      txData[i+1] = c & 0xff;
+    }   
+    while (count >= X86_BUFFSIZE) {
+	  SPI.transferBuffer(txData, rxData, 2*X86_BUFFSIZE);
+	  count -= X86_BUFFSIZE;
+    }
+    if (count)
+	  SPI.transferBuffer(txData, rxData, 2*count);
+  }
 #else
   union { uint16_t val; struct { uint8_t lsb; uint8_t msb; }; } out;
   out.val = c;
@@ -85,23 +112,23 @@ void inline Adafruit_ILI9341::spiwriteN(uint32_t count, uint16_t c) {
 }
 
 void Adafruit_ILI9341::writecommand(uint8_t c) {
-  *dcport &=  ~dcpinmask;
+  DCLow();
   //digitalWrite(_dc, LOW);
 
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwrite(c);
 
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
 }
 
 // Like above, but does not raise CS at end
 void Adafruit_ILI9341::writecommand_cont(uint8_t c) {
-  *dcport &=  ~dcpinmask;
+  DCLow();
   //digitalWrite(_dc, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwrite(c);
@@ -109,38 +136,38 @@ void Adafruit_ILI9341::writecommand_cont(uint8_t c) {
 
 
 void Adafruit_ILI9341::writedata(uint8_t c) {
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
   
   spiwrite(c);
 
   //digitalWrite(_cs, HIGH);
-  *csport |= cspinmask;
+  CSHigh();
 } 
 
 void Adafruit_ILI9341::writedata_cont(uint8_t c) {
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
   
   spiwrite(c);
 } 
 
 void Adafruit_ILI9341::writedata16(uint16_t color) {
-  *dcport |=  dcpinmask;
-  *csport &= ~cspinmask;
+  DCHigh();
+  CSLow();
 
   spiwrite16(color);
 
-  *csport |= cspinmask;
+  CSHigh();
 }
 
 void Adafruit_ILI9341::writedata16_cont(uint16_t color) {
-  *dcport |=  dcpinmask;
-  *csport &= ~cspinmask;
+  DCHigh();
+  CSLow();
   spiwrite16(color);
 }
 
@@ -156,6 +183,16 @@ inline void Adafruit_ILI9341::spi_begin(void) {
 inline void Adafruit_ILI9341::spi_end(void) {
   SPI.endTransaction();
 }
+#elif defined( __ARDUINO_X86__)
+inline void Adafruit_ILI9341::spi_begin(void) {
+  SPI.setClockDivider(SPI_CLOCK_DIV2); // 8-ish MHz (full! speed!)
+  SPI.setBitOrder(MSBFIRST);
+  SPI.setDataMode(SPI_MODE0);
+}
+
+inline void Adafruit_ILI9341::spi_end(void) {
+}
+
 #else
 inline void Adafruit_ILI9341::spi_begin(void) {
 }
@@ -206,10 +243,14 @@ void Adafruit_ILI9341::begin(void) {
 
   pinMode(_dc, OUTPUT);
   pinMode(_cs, OUTPUT);
+
+#ifndef __ARDUINO_X86__
+  
   csport    = portOutputRegister(digitalPinToPort(_cs));
   cspinmask = digitalPinToBitMask(_cs);
   dcport    = portOutputRegister(digitalPinToPort(_dc));
   dcpinmask = digitalPinToBitMask(_dc);
+#endif
 
 #if defined (__AVR__)
   SPI.begin();
@@ -217,7 +258,8 @@ void Adafruit_ILI9341::begin(void) {
   SPI.setBitOrder(MSBFIRST);
   SPI.setDataMode(SPI_MODE0);
   mySPCR = SPCR;
-#elif defined(TEENSYDUINO)
+#elif defined(TEENSYDUINO) || defined(__ARDUINO_X86__)
+
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV2); // 8 MHz (full! speed!)
   SPI.setBitOrder(MSBFIRST);
@@ -402,13 +444,13 @@ void Adafruit_ILI9341::drawPixel(int16_t x, int16_t y, uint16_t color) {
   setAddrWindow(x,y,x+1,y+1);
 
   //digitalWrite(_dc, HIGH);
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_cs, LOW);
-  *csport &= ~cspinmask;
+  CSLow();
 
   spiwrite16(color);
 
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
   spi_end();
 }
@@ -426,13 +468,13 @@ void Adafruit_ILI9341::drawFastVLine(int16_t x, int16_t y, int16_t h,
   spi_begin();
   setAddrWindow(x, y, x, y+h-1);
 
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwriteN(h, color);
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
   spi_end();
 }
@@ -447,12 +489,12 @@ void Adafruit_ILI9341::drawFastHLine(int16_t x, int16_t y, int16_t w,
   spi_begin();
   setAddrWindow(x, y, x+w-1, y);
 
-  *dcport |=  dcpinmask;
-  *csport &= ~cspinmask;
+  DCHigh();
+  CSLow();
   //digitalWrite(_dc, HIGH);
   //digitalWrite(_cs, LOW);
   spiwriteN(w, color);
-  *csport |= cspinmask;
+  CSHigh();
   //digitalWrite(_cs, HIGH);
   spi_end();
 }
@@ -473,14 +515,14 @@ void Adafruit_ILI9341::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
   spi_begin();
   setAddrWindow(x, y, x+w-1, y+h-1);
 
-  *dcport |=  dcpinmask;
+  DCHigh();
   //digitalWrite(_dc, HIGH);
-  *csport &= ~cspinmask;
+  CSLow();
   //digitalWrite(_cs, LOW);
 
   spiwriteN((uint32_t)h*w, color);
   //digitalWrite(_cs, HIGH);
-  *csport |= cspinmask;
+  CSHigh();
   spi_end();
 }
 
@@ -603,14 +645,14 @@ uint16_t Adafruit_ILI9341::readPixel(int16_t x, int16_t y)
     setAddr(x, y, x, y);
     writecommand_cont(ILI9341_RAMRD); // read from RAM
 //	waitTransmitComplete();
-    *dcport |=  dcpinmask;  // make sure we are in data mode
+    DCHigh();  // make sure we are in data mode
 
 	// Read Pixel Data
 	r = spiread();	    // Read a DUMMY byte of GRAM
 	r = spiread();		// Read a RED byte of GRAM
 	g = spiread();		// Read a GREEN byte of GRAM
 	b = spiread();		// Read a BLUE byte of GRAM
-   *csport |= cspinmask;
+   CSHigh();
  //  digitalWrite(_cs, HIGH);
    spi_end();
 	return color565(r,g,b);
@@ -625,7 +667,7 @@ void Adafruit_ILI9341::readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint
 
 	setAddr(x, y, x+w-1, y+h-1);
     writecommand_cont(ILI9341_RAMRD); // read from RAM
-    *dcport |=  dcpinmask;  // make sure we are in data mode
+    DCHigh();  // make sure we are in data mode
 
 //    spiwrite(c);
    	r = spiread();	        // Read a DUMMY byte of GRAM
@@ -636,7 +678,7 @@ void Adafruit_ILI9341::readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint
         b = spiread();		// Read a BLUE byte of GRAM
         *pcolors++ = color565(r,g,b);
     }
-   *csport |= cspinmask;
+   CSHigh();
    spi_end();
 }
 
@@ -646,13 +688,13 @@ void Adafruit_ILI9341::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, uin
     spi_begin();
 	setAddr(x, y, x+w-1, y+h-1);
 	writecommand_cont(ILI9341_RAMWR);
-    *dcport |=  dcpinmask;  // make sure we are in data mode
+    DCHigh();  // make sure we are in data mode
 	for(y=h; y>0; y--) {
 		for(x=w; x>0; x--) {
             spiwrite(*pcolors >> 8);
             spiwrite(*pcolors++ & 0xff);
 		}
 	}
-    *csport |= cspinmask;
+    CSHigh();
    spi_end();
 }
