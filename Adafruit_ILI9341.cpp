@@ -594,6 +594,8 @@ uint8_t inline Adafruit_ILI9341::spiread(void) {
   SPCR = backupSPCR;
 #elif defined(TEENSYDUINO)
   r = SPI.transfer(0x00);
+#elif defined (__ARDUINO_X86__)
+  r = SPI.transfer(0x00);
 #elif defined (__arm__)
   SPI.setClockDivider(11); // 8-ish MHz (full! speed!)
   SPI.setBitOrder(MSBFIRST);

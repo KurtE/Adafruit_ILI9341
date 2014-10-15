@@ -172,7 +172,7 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
 #if defined( __ARDUINO_X86__)
       digitalWrite(_dc, LOW);
 #else
-      DCLow();
+      *dcport &=  ~dcpinmask;
 #endif
 	}
 
